@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TOMBSTONE 1
 
 size_t hash(char* val, int capacity) {
     size_t hash = 0x13371337deadbeef;
@@ -19,38 +18,53 @@ size_t hash(char* val, int capacity) {
 }
 
 // function kv put:
-// returns: the index of the key, on error returns -1, -2 on not found
-int kv_put(kv_t* db, char* key, char* value) {
-    if (!db || !key || !value) {return -1;}
+// returns: the index of the key, on error returns -1
+int kv_put(kv_t* db, const char* key, const char* value) {
+    if (!db || !key || !value) return -1;
 
     size_t idx = hash(key, db->capacity);
+    kv_entry_t* first_tomb = NULL;
+    kv_entry_t* target = NULL;
 
-    for (size_t i = 0; i < db->capacity - 1; i++) {
-        size_t real_idx = (idx + 1) % db->capacity;
-        kv_entry_t* entry = &db->entries[real_idx];
+    for (size_t i = 0; i < db->capacity; i++) {
+        kv_entry_t* entry = &db->entries[(idx + i) % db->capacity];
 
-        if (entry-> key && entry-> key != (void*)TOMBSTONE && !strcmp(entry->key, key)) {
+        if (entry->key == NULL) {
+            target = first_tomb ? first_tomb : entry;
+            break;
+        }
 
+        if (entry->key == TOMBSTONE) {
+            if (!first_tomb) first_tomb = entry;
+            continue;
+        }
+
+        if (strcmp(entry->key, key) == 0) {
             char* new_val = strdup(value);
             if (!new_val) return -1;
+            free(entry->value);
             entry->value = new_val;
-        }
-
-        if (!entry->key || entry->key == (void*)TOMBSTONE) {
-            char* new_val = strdup(value);
-            char* new_key = strdup(key);
-            if (!new_val || !new_key) {
-                free(new_key);
-                free(new_val);
-                return -1;
-            }
-            entry->value = new_val;
-            entry->key = new_key;
-            db->count++;
-            return real_idx;
+            return 0;
         }
     }
-    return -2;
+
+    // probed the table without finding an empty slot
+    if (!target) target = first_tomb;
+    if (!target) return -1;
+
+    // insert new entry
+    char* new_key = strdup(key);
+    char* new_val = strdup(value);
+    if (!new_key || !new_val) {
+        free(new_key);
+        free(new_val);
+        return -1;
+    }
+
+    target->key = new_key;
+    target->value = new_val;
+    db->count++;
+    return 0;
 }
 
 kv_t* kv_init(size_t capacity) {
@@ -65,6 +79,7 @@ kv_t* kv_init(size_t capacity) {
     table->count = 0;
     table->entries = calloc(capacity, sizeof(kv_entry_t));
     if (table->entries == NULL) {
+        free(table);
         return NULL;
     }
 
