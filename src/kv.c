@@ -4,7 +4,7 @@
 #include <string.h>
 
 
-size_t hash(char* val, int capacity) {
+size_t hash(const char* val, int capacity) {
     size_t hash = 0x13371337deadbeef;
 
     while (*val) {
@@ -30,6 +30,7 @@ int kv_put(kv_t* db, const char* key, const char* value) {
         kv_entry_t* entry = &db->entries[(idx + i) % db->capacity];
 
         if (entry->key == NULL) {
+            // empty slot: the chain ends here, key doesn't exist
             target = first_tomb ? first_tomb : entry;
             break;
         }
@@ -40,6 +41,7 @@ int kv_put(kv_t* db, const char* key, const char* value) {
         }
 
         if (strcmp(entry->key, key) == 0) {
+            // update existing key
             char* new_val = strdup(value);
             if (!new_val) return -1;
             free(entry->value);
@@ -48,7 +50,7 @@ int kv_put(kv_t* db, const char* key, const char* value) {
         }
     }
 
-    // probed the table without finding an empty slot
+    // probed the whole table without finding an empty slot
     if (!target) target = first_tomb;
     if (!target) return -1;
 
