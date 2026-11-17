@@ -1,5 +1,6 @@
 #include <kv.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +16,41 @@ size_t hash(const char* val, int capacity) {
         val++;
     }
     return hash % capacity;
+}
+
+char* kv_get(kv_t* db, char* key) {
+    if (!db || !key) return NULL;
+
+    size_t idx = hash(key, db->capacity);
+
+    for (size_t i = 0; i < db->capacity; i++) {
+        size_t real_idx = (idx + i) % db->capacity;
+
+        kv_entry_t* entry = &db->entries[real_idx];
+
+        // no key found, return nothing
+        if (entry->key == NULL) return NULL;
+
+        // tombstone: something was deleted, keep probing
+        if (entry->key == TOMBSTONE) continue;
+
+        // find an entry and keys match
+        if (strcmp(entry->key, key) == 0) return entry->value;
+    }
+    return NULL;
+}
+
+void kv_free(kv_t* db)  {
+    if (!db) return;
+    for (size_t i = 0; i < db->capacity; i++) {
+        char* k = db->entries[i].key;
+        if (k && k != TOMBSTONE) {
+            free(k);
+            free(db->entries[i].value);
+        }
+    }
+    free(db->entries);
+    free(db);
 }
 
 // function kv put:

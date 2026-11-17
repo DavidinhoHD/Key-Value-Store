@@ -1,5 +1,5 @@
 CC     = gcc-16
-CFLAGS = -std=c23 -pedantic -Wall -Wextra -Iinc
+CFLAGS = -std=c23 -pedantic -Wall -Wextra -Iinc -g -fsanitize=address,undefined
 SRCS   = $(wildcard src/*.c)
 HDRS = $(wildcard inc/*.h)
 
